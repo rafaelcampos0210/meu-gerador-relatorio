@@ -7,40 +7,24 @@ import io
 import re
 import google.generativeai as genai
 
-# --- 0. SUA CHAVE API (CONFIGURADA) ---
+# --- 0. CHAVE API ---
 CHAVE_API_GOOGLE = "AIzaSyBCdhqPkOVtQtO9x-pQTABb7X258-Si4VQ"
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Gerador PCPE - IA Integrada", layout="wide", page_icon="🚓")
 
-# --- 2. ESTILO VISUAL (CSS) ---
+# --- 2. ESTILO ---
 st.markdown("""
     <style>
     .main {background-color: #f8f9fa;}
     .stTextInput>div>div>input {font-weight: 500;}
     .stTextArea textarea {font-size: 15px; line-height: 1.6; font-family: 'Arial';}
-    .tag-foto {
-        background-color: #e3f2fd; 
-        border: 1px solid #1565c0; 
-        color: #1565c0; 
-        padding: 2px 8px; 
-        border-radius: 4px; 
-        font-weight: bold; 
-        font-family: monospace;
-    }
-    .sucesso-ia {
-        padding: 10px; 
-        background-color: #d4edda; 
-        color: #155724; 
-        border-radius: 5px; 
-        margin-bottom: 10px; 
-        border: 1px solid #c3e6cb;
-    }
+    .tag-foto {background-color: #e3f2fd; border: 1px solid #1565c0; color: #1565c0; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: monospace;}
+    .sucesso-ia {padding: 10px; background-color: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 10px; border: 1px solid #c3e6cb;}
     </style>
 """, unsafe_allow_html=True)
 
 # --- 3. FUNÇÕES ---
-
 def aplicar_estilo(paragrafo, tamanho=11, negrito=False, alinhamento=None, espaco_depois=0, entrelinhas=1.0, recuo=0):
     for run in paragrafo.runs:
         run.font.name = 'Arial'
@@ -54,12 +38,10 @@ def aplicar_estilo(paragrafo, tamanho=11, negrito=False, alinhamento=None, espac
     if alinhamento is not None: paragrafo.alignment = alinhamento
 
 def melhorar_texto_com_ia(texto_bruto):
-    """Usa a chave fixa configurada no topo do arquivo."""
     try:
         genai.configure(api_key=CHAVE_API_GOOGLE)
-        
-        # --- CORREÇÃO AQUI: Mudado para 'gemini-pro' (Modelo Estável) ---
-        model = genai.GenerativeModel('gemini-pro')
+        # Tenta o modelo Flash (mais rápido e moderno)
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
         Você é um escrivão de polícia experiente. Reescreva o relato abaixo para um Relatório Oficial de Investigação.
@@ -67,7 +49,7 @@ def melhorar_texto_com_ia(texto_bruto):
         DIRETRIZES:
         1. Corrija rigorosamente a gramática e ortografia.
         2. Utilize linguagem formal, técnica e impessoal (Ex: substitua "eu vi" por "a equipe visualizou").
-        3. Mantenha as tags de fotos (ex: [FOTO1], [FOTO2]) EXATAMENTE onde estão.
+        3. Mantenha as tags de fotos (ex: [FOTO1]) EXATAMENTE onde estão.
         4. Seja claro, conciso e cronológico.
         5. Não invente informações.
         
@@ -77,12 +59,15 @@ def melhorar_texto_com_ia(texto_bruto):
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        return f"Erro na IA: {str(e)}"
+        # Se der erro, tenta listar os modelos disponíveis para ajudar no diagnóstico
+        erro_msg = str(e)
+        if "404" in erro_msg:
+            return f"⚠️ ERRO DE VERSÃO: O Streamlit não atualizou a biblioteca. \n\nSOLUÇÃO: Vá no painel do Streamlit, clique nos 3 pontinhos do app e selecione 'Reboot app'."
+        return f"Erro na IA: {erro_msg}"
 
 # --- 4. ESTADO ---
 if 'num_agentes' not in st.session_state: st.session_state.num_agentes = 1
 if 'texto_final' not in st.session_state: st.session_state.texto_final = ""
-
 def add_agente(): st.session_state.num_agentes += 1
 def remove_agente(): 
     if st.session_state.num_agentes > 1: st.session_state.num_agentes -= 1
@@ -91,24 +76,30 @@ def remove_agente():
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/9203/9203764.png", width=60)
     st.header("Configurações")
-    st.success("✅ IA Ativada (Modelo Pro)")
     
+    # Verifica a versão da biblioteca (Diagnóstico)
+    versao_lib = genai.__version__
+    if versao_lib < "0.7.0":
+        st.error(f"⚠️ Biblioteca Antiga Detectada ({versao_lib})")
+        st.info("Por favor, faça o REBOOT do app para atualizar.")
+    else:
+        st.success(f"✅ Sistema Atualizado (v{versao_lib})")
+
     st.divider()
-    st.subheader("📄 Cabeçalho do Documento")
+    st.subheader("📄 Cabeçalho")
     titulo_doc = st.text_input("Título:", value="RELATÓRIO DE INVESTIGAÇÃO")
     opj = st.text_input("OPJ:", placeholder="Ex: INTERCEPTUM")
-    natureza = st.text_input("Natureza:", placeholder="Ex: Homicídio, Tráfico...")
+    natureza = st.text_input("Natureza:", placeholder="Ex: Homicídio...")
     processo = st.text_input("Nº Processo/BO:", placeholder="0000...")
     c1, c2 = st.columns(2)
     data_doc = c1.date_input("Data:")
     hora_doc = c2.time_input("Hora:")
     local = st.text_input("Local:", placeholder="Endereço completo...")
 
-# --- 6. INTERFACE PRINCIPAL ---
-st.title("🚓 Gerador Policial com IA Integrada")
+# --- 6. INTERFACE ---
+st.title("🚓 Gerador Policial com IA")
 
-# Abas
-tab_env, tab_texto, tab_fotos, tab_equipe = st.tabs(["👥 Envolvidos", "✨ Relato com IA", "📸 Evidências", "👮 Equipe"])
+tab_env, tab_texto, tab_fotos, tab_equipe = st.tabs(["👥 Envolvidos", "✨ Relato (IA)", "📸 Fotos", "👮 Equipe"])
 
 # ABA 1: ENVOLVIDOS
 with tab_env:
@@ -120,7 +111,7 @@ with tab_env:
         alvo_docs = st.text_input("CPF/RG:")
         alvo_nasc = st.text_input("Nascimento:")
     with c2:
-        st.markdown("#### 🔵 Outros Envolvidos")
+        st.markdown("#### 🔵 Outros")
         vitima_nome = st.text_input("Nome Vítima:")
         testemunha_nome = st.text_input("Testemunha:")
         advogado_nome = st.text_input("Advogado:")
@@ -142,8 +133,8 @@ with tab_fotos:
 
 # ABA 2: TEXTO IA
 with tab_texto:
-    col_rasc, col_fin = st.columns(2)
-    with col_rasc:
+    c_in, c_out = st.columns(2)
+    with c_in:
         st.markdown("#### Rascunho")
         rascunho = st.text_area("Digite o relato bruto:", height=400, 
             placeholder="Ex: Chegamos e ele correu [FOTO1]...")
@@ -152,15 +143,18 @@ with tab_texto:
             if not rascunho:
                 st.warning("Escreva algo primeiro!")
             else:
-                with st.spinner("A IA está reescrevendo (Modelo Pro)..."):
+                with st.spinner("A IA está reescrevendo..."):
                     res = melhorar_texto_com_ia(rascunho)
                     st.session_state.texto_final = res
                     st.rerun()
 
-    with col_fin:
-        st.markdown("#### Texto Oficial")
+    with c_out:
+        st.markdown("#### Texto Final")
         if st.session_state.texto_final:
-            st.markdown("<div class='sucesso-ia'>✅ Texto Pronto!</div>", unsafe_allow_html=True)
+            if "ERRO" in st.session_state.texto_final:
+                st.error(st.session_state.texto_final)
+            else:
+                st.markdown("<div class='sucesso-ia'>✅ Texto Pronto!</div>", unsafe_allow_html=True)
         texto_oficial = st.text_area("Resultado:", height=400, value=st.session_state.texto_final)
 
 # ABA 4: EQUIPE
@@ -179,8 +173,6 @@ with tab_equipe:
 st.markdown("---")
 if st.button("🚀 BAIXAR RELATÓRIO FINAL", type="primary"):
     doc = Document()
-    
-    # Margens Oficiais
     sec = doc.sections[0]
     sec.top_margin = Inches(0.5); sec.bottom_margin = Inches(0.5)
     sec.left_margin = Inches(0.7); sec.right_margin = Inches(0.7)
@@ -233,11 +225,9 @@ if st.button("🚀 BAIXAR RELATÓRIO FINAL", type="primary"):
     p.add_run("DO RELATO")
     aplicar_estilo(p, negrito=True, espaco_depois=6)
     
-    # Escolhe qual texto usar
     txt_uso = texto_oficial if texto_oficial else rascunho
-    
-    # Processa Fotos [FOTO1]
     parts = re.split(r'\[FOTO(\d+)\]', txt_uso)
+    
     for part in parts:
         if part.isdigit():
             idx = int(part) - 1
