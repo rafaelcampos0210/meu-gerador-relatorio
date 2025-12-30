@@ -5,7 +5,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 import io
 
-# Função de estilo
+# Função para forçar fonte Arial (Padrão PCPE)
 def estilo(run, tamanho=11, negrito=False):
     run.font.name = 'Arial'
     run._element.rPr.rFonts.set(qn('w:eastAsia'), 'Arial')
@@ -13,10 +13,9 @@ def estilo(run, tamanho=11, negrito=False):
     run.bold = negrito
 
 st.set_page_config(page_title="Gerador PCPE Pro", layout="centered")
-st.title("🚓 Gerador de Relatório (Com Correção de Texto)")
+st.title("🚓 Gerador de Relatório (Corrigido)")
 
 with st.form("main"):
-    # ... (Os campos continuam os mesmos, para economizar espaço vou focar na lógica)
     col1, col2 = st.columns(2)
     with col1:
         opj = st.text_input("OPJ:", "INTERCEPTUM")
@@ -32,12 +31,12 @@ with st.form("main"):
     testemunha = st.text_input("Testemunha:", "Sra. Marilene...")
     
     st.markdown("---")
-    st.caption("Texto do Relatório (Copie e cole aqui)")
-    # O segredo: height maior para ver melhor
-    relato = st.text_area("Descrição:", height=400, help("O texto manterá os parágrafos originais."))
+    st.caption("Texto do Relatório")
+    # CORREÇÃO AQUI: help= (com sinal de igual)
+    relato = st.text_area("Descrição:", height=400, help="O texto manterá os parágrafos originais.")
     
     fotos = st.file_uploader("Fotos", accept_multiple_files=True)
-    btn = st.form_submit_button("GERAR CORRIGIDO")
+    btn = st.form_submit_button("GERAR RELATÓRIO")
 
 if btn:
     doc = Document()
@@ -70,10 +69,10 @@ if btn:
     # 3. Título
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run("RELATÓRIO DE INVESTIGAÇÃO / BUSCA E APREENSÃO")
+    run = p.add_run("RELATÓRIO DE CUMPRIMENTO DE MANDADO DE BUSCA E APREENSÃO DOMICILIAR")
     estilo(run, 12, True)
 
-    # 4. Dados Técnicos (Linha a Linha)
+    # 4. Dados Técnicos
     def add_dado(label, valor):
         p = doc.add_paragraph()
         r1 = p.add_run(f"{label}: ")
@@ -82,40 +81,36 @@ if btn:
         estilo(r2)
         p.paragraph_format.space_after = Pt(2)
 
-    add_dado("OPJ", opj)
-    add_dado("PROCESSO", processo)
-    add_dado("DATA/LOCAL", f"{data} - {local}")
+    add_dado("OPERAÇÃO DE POLÍCIA JUDICIÁRIA (OPJ)", f"\"{opj}\"")
+    add_dado("PROCESSO nº", processo)
+    add_dado("DATA", data)
+    add_dado("LOCAL", local)
 
     doc.add_paragraph()
 
-    # 5. Seção Alvo (Mais organizada)
+    # 5. Seção Alvo
     p = doc.add_paragraph()
-    estilo(p.add_run("DO ALVO E ENVOLVIDOS"), negrito=True)
+    estilo(p.add_run("DO ALVO E TESTEMUNHAS"), negrito=True)
     
-    # Usando uma tabela invisível para alinhar os dados do alvo (Fica mais bonito)
-    t_alvo = doc.add_table(rows=3, cols=1)
-    t_alvo.getCell(0,0).text = f"ALVO: {alvo}" # Correção: usar .cell(0,0) na prática, simplifiquei aqui
-    # Maneira simples:
     add_dado("ALVO", alvo)
     add_dado("ADVOGADO", advogado)
     add_dado("TESTEMUNHA", testemunha)
 
     doc.add_paragraph()
 
-    # 6. SEÇÃO DILIGÊNCIA (A CORREÇÃO DO TEXTO ESTÁ AQUI)
+    # 6. SEÇÃO DILIGÊNCIA (Quebra de parágrafos correta)
     p = doc.add_paragraph()
-    estilo(p.add_run("DA DILIGÊNCIA / RELATO"), negrito=True)
+    estilo(p.add_run("DA DILIGÊNCIA E CUMPRIMENTO DO MANDADO"), negrito=True)
 
-    # O SEGREDO: Dividir o texto onde tiver "Enter"
+    # Divide o texto onde você deu Enter
     paragrafos = relato.split('\n') 
     
     for paragrafo in paragrafos:
-        if paragrafo.strip(): # Só adiciona se tiver texto (pula linhas vazias)
+        if paragrafo.strip(): # Só adiciona se tiver texto
             p_novo = doc.add_paragraph()
             p_novo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             run_p = p_novo.add_run(paragrafo)
             estilo(run_p, 11)
-            # Adiciona um pequeno espaço depois de cada parágrafo
             p_novo.paragraph_format.space_after = Pt(6)
 
     # 7. Fotos
@@ -128,13 +123,13 @@ if btn:
             
             p_leg = doc.add_paragraph()
             p_leg.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            estilo(p_leg.add_run(f"Evidência: {f.name}"), 9)
+            estilo(p_leg.add_run(f"Registro Fotográfico: {f.name}"), 9)
 
     # 8. Rodapé
     foot = sec.footer.paragraphs[0]
     foot.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    estilo(foot.add_run("Av. São Sebastião - Surubim - PE | (81) 3624-1974"), 8)
+    estilo(foot.add_run("Av. São Sebastião - Surubim - PE | Fone: (81) 3624-1974\nE-mail: dp116circ.surubim@policiacivil.pe.gov.br"), 8)
 
     bio = io.BytesIO()
     doc.save(bio)
-    st.download_button("⬇️ Baixar Relatório Corrigido", bio.getvalue(), "Relatorio_v3.docx")
+    st.download_button("⬇️ Baixar Relatório Corrigido", bio.getvalue(), "Relatorio_PCPE_vFinal.docx")
