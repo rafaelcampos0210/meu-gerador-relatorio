@@ -8,7 +8,6 @@ import re
 import google.generativeai as genai
 
 # --- 0. SUA CHAVE API (CONFIGURADA) ---
-# Aqui está a chave que você me enviou. O sistema usará ela automaticamente.
 CHAVE_API_GOOGLE = "AIzaSyBCdhqPkOVtQtO9x-pQTABb7X258-Si4VQ"
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
@@ -58,8 +57,9 @@ def melhorar_texto_com_ia(texto_bruto):
     """Usa a chave fixa configurada no topo do arquivo."""
     try:
         genai.configure(api_key=CHAVE_API_GOOGLE)
-        # Tenta usar o modelo Flash (mais rápido)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # --- CORREÇÃO AQUI: Mudado para 'gemini-pro' (Modelo Estável) ---
+        model = genai.GenerativeModel('gemini-pro')
         
         prompt = f"""
         Você é um escrivão de polícia experiente. Reescreva o relato abaixo para um Relatório Oficial de Investigação.
@@ -91,7 +91,7 @@ def remove_agente():
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/9203/9203764.png", width=60)
     st.header("Configurações")
-    st.success("✅ IA Ativada (Chave Integrada)")
+    st.success("✅ IA Ativada (Modelo Pro)")
     
     st.divider()
     st.subheader("📄 Cabeçalho do Documento")
@@ -148,12 +148,11 @@ with tab_texto:
         rascunho = st.text_area("Digite o relato bruto:", height=400, 
             placeholder="Ex: Chegamos e ele correu [FOTO1]...")
         
-        # Botão Simplificado (Sem pedir chave)
         if st.button("✨ MELHORAR TEXTO"):
             if not rascunho:
                 st.warning("Escreva algo primeiro!")
             else:
-                with st.spinner("A IA está reescrevendo..."):
+                with st.spinner("A IA está reescrevendo (Modelo Pro)..."):
                     res = melhorar_texto_com_ia(rascunho)
                     st.session_state.texto_final = res
                     st.rerun()
@@ -271,4 +270,4 @@ if st.button("🚀 BAIXAR RELATÓRIO FINAL", type="primary"):
     bio = io.BytesIO()
     doc.save(bio)
     st.balloons()
-    st.download_button("📥 BAIXAR DOCX", bio.getvalue(), "Relatorio_Policial.docx", type="primary")
+    st.download_button("📥 BAIXAR DOCX", bio.getvalue(), "Relatorio_Final.docx", type="primary")
