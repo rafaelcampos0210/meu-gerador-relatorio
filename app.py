@@ -104,7 +104,8 @@ with st.sidebar:
         api_key = st.secrets['GOOGLE_API_KEY']
         st.success("🔑 API Key ativa (Segredos)")
     else:
-        api_key = st.text_input("Cole sua Google API Key:", type="password", help("Pegue em aistudio.google.com"))
+        # AQUI ESTAVA O ERRO: Corrigido de help(...) para help="..."
+        api_key = st.text_input("Cole sua Google API Key:", type="password", help="Pegue em aistudio.google.com")
 
     st.divider()
     st.subheader("📄 Cabeçalho do Doc")
