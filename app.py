@@ -5,77 +5,87 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 import io
 
-def format_font(run, size=11, bold=False):
+def formatar_fonte(run, tamanho=11, negrito=False):
     run.font.name = 'Arial'
     run._element.rPr.rFonts.set(qn('w:eastAsia'), 'Arial')
-    run.font.size = Pt(size)
-    run.bold = bold
+    run.font.size = Pt(tamanho)
+    run.bold = negrito
 
-st.set_page_config(page_title="Gerador PCPE", layout="centered")
+st.set_page_config(page_title="Gerador PCPE Oficial", layout="centered")
+
 st.title("🚓 Gerador de Relatório Oficial")
 
-with st.form("form_pcpe"):
+with st.form("dados"):
     opj = st.text_input("OPJ:", "INTERCEPTUM")
-    processo = st.text_input("Processo:", "0002343-02.2025.8.17.3410")
+    proc = st.text_input("Processo nº:", "0002343-02.2025.8.17.3410")
     data_hora = st.text_input("Data/Hora:", "22 de dezembro de 2025 às 14h23")
     local = st.text_input("Local:", "Sítio Salvador, nº 360, Zona Rural, Vertente do Lério/PE")
     alvo = st.text_input("Alvo:", "ALEX DO CARMO CORREIA | CPF: 167.476.854-07")
-    relato = st.text_area("Descrição da Diligência:", height=200)
-    fotos = st.file_uploader("Fotos", accept_multiple_files=True)
-    enviar = st.form_submit_button("Gerar Relatório Idêntico")
+    relato = st.text_area("Descrição da Ocorrência:", height=300)
+    fotos = st.file_uploader("Subir Fotos", accept_multiple_files=True)
+    gerar = st.form_submit_button("GERAR RELATÓRIO COM LOGO")
 
-if enviar:
+if gerar:
     doc = Document()
-    # Ajuste de margens conforme o DOCX original
-    section = doc.sections[0]
-    section.top_margin, section.bottom_margin = Inches(0.5), Inches(0.5)
-    section.left_margin, section.right_margin = Inches(0.7), Inches(0.7)
-
-    # CABEÇALHO (Tabela para alinhar Logo e Texto)
-    table = doc.add_table(rows=1, cols=2)
-    table.columns[0].width = Inches(1.0)
-    try:
-        run_img = table.cell(0,0).paragraphs[0].add_run()
-        run_img.add_picture('logo_pc.png', width=Inches(0.85))
-    except: pass
     
-    txt_head = table.cell(0,1).paragraphs[0]
-    run_h = txt_head.add_run("POLÍCIA CIVIL DE PERNAMBUCO\nDINTER 1-16ª DESEC\nDelegacia de Polícia da 116ª Circunscrição - Surubim")
-    format_font(run_h, size=10, bold=True)
+    # Margens do modelo oficial
+    sec = doc.sections[0]
+    sec.top_margin, sec.bottom_margin = Inches(0.5), Inches(0.5)
+    sec.left_margin, sec.right_margin = Inches(0.7), Inches(0.7)
 
-    # TÍTULO CENTRALIZADO
-    p_t = doc.add_paragraph()
-    p_t.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_t = p_t.add_run("\nRELATÓRIO DE CUMPRIMENTO DE MANDADO DE BUSCA E APREENSÃO DOMICILIAR")
-    format_font(run_t, size=11, bold=True)
+    # CABEÇALHO COM TABELA (Para o Logo e o Texto ficarem lado a lado)
+    tab = doc.add_table(rows=1, cols=2)
+    tab.columns[0].width = Inches(1.2)
+    
+    # Aqui o código procura a imagem que você subiu no GitHub
+    try:
+        par_logo = tab.cell(0, 0).paragraphs[0]
+        run_logo = par_logo.add_run()
+        run_logo.add_picture('logo_pc.png', width=Inches(0.9))
+    except Exception:
+        tab.cell(0, 0).text = " " # Fica em branco se a imagem não estiver no GitHub
 
-    # CORPO DO TEXTO (Igual ao PDF/DOCX)
-    infos = [f"OPJ: \"{opj}\"", f"PROCESSO nº {processo}", f"DATA/HORA: {data_hora}", f"LOCAL: {local}"]
+    # Texto Institucional
+    p_head = tab.cell(0, 1).paragraphs[0]
+    r_head = p_head.add_run("POLÍCIA CIVIL DE PERNAMBUCO\nDINTER 1 - 16ª DESEC\nDelegacia de Polícia da 116ª Circunscrição - Surubim")
+    formatar_fonte(r_head, tamanho=10, negrito=True)
+
+    # Título Central
+    p_tit = doc.add_paragraph()
+    p_tit.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_tit = p_tit.add_run("\nRELATÓRIO DE CUMPRIMENTO DE MANDADO DE BUSCA E APREENSÃO DOMICILIAR")
+    formatar_fonte(r_tit, tamanho=11, negrito=True)
+
+    # Dados do Processo
+    infos = [f"OPERAÇÃO DE POLÍCIA JUDICIÁRIA (OPJ): \"{opj}\"", f"PROCESSO nº {proc}", f"DATA/HORA: {data_hora}", f"LOCAL: {local}"]
     for info in infos:
-        run_i = doc.add_paragraph().add_run(info)
-        format_font(run_i)
+        r = doc.add_paragraph().add_run(info)
+        formatar_fonte(r)
 
-    # SEÇÕES
-    for sec in ["DO ALVO E TESTEMUNHAS", "DA DILIGÊNCIA E CUMPRIMENTO DO MANDADO"]:
-        run_s = doc.add_paragraph().add_run(f"\n{sec}")
-        format_font(run_s, bold=True)
-        txt = alvo if "ALVO" in sec else relato
-        run_txt = doc.add_paragraph().add_run(txt)
-        format_font(run_txt)
-        doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    # Seções
+    for titulo in ["DO ALVO E TESTEMUNHAS", "DA DILIGÊNCIA E CUMPRIMENTO DO MANDADO"]:
+        r_s = doc.add_paragraph().add_run(f"\n{titulo}")
+        formatar_fonte(r_s, negrito=True)
+        texto = alvo if "ALVO" in titulo else relato
+        p_t = doc.add_paragraph()
+        p_t.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        r_t = p_t.add_run(texto)
+        formatar_fonte(r_t)
 
-    # FOTOS E RODAPÉ
+    # Anexo de Fotos
     if fotos:
         for f in fotos:
             doc.add_page_break()
-            doc.add_picture(f, width=Inches(5.5))
-    
-    # RODAPÉ OFICIAL
-    footer = section.footer.paragraphs[0]
-    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_f = footer.add_run("Av. São Sebastião - Surubim - PE | Fone: (81) 36241974")
-    format_font(run_f, size=8)
+            p_img = doc.add_paragraph()
+            p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_img.add_run().add_picture(f, width=Inches(5.5))
 
-    output = io.BytesIO()
-    doc.save(output)
-    st.download_button("Baixar Relatório", output.getvalue(), "Relatorio_Oficial.docx")
+    # Rodapé (Surubim)
+    footer = sec.footer.paragraphs[0]
+    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_f = footer.add_run("Av. São Sebastião - Surubim - PE | Fone: (81) 36241974")
+    formatar_fonte(r_f, tamanho=8)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    st.download_button("⬇️ Baixar Relatório Fiel", buf.getvalue(), "Relatorio_Final_PCPE.docx")
