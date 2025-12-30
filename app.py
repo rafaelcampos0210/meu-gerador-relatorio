@@ -4,204 +4,214 @@ from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 import io
-import re  # Biblioteca para encontrar as tags [FOTO1] no texto
+import re
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Relatório Policial Inteligente", layout="wide", page_icon="🚓")
+st.set_page_config(page_title="Gerador Universal PCPE", layout="wide", page_icon="🚓")
 
 # --- ESTILO CSS ---
 st.markdown("""
     <style>
     .main {background-color: #f8f9fa;}
-    h1 {color: #1f2c56;}
-    .stButton>button {width: 100%; border-radius: 5px; height: 3em; font-weight: bold;}
+    .stTextInput>div>div>input {font-weight: bold;}
     .tag-foto {
-        background-color: #e0f7fa; 
-        border: 1px solid #006064; 
-        color: #006064; 
-        padding: 2px 6px; 
-        border-radius: 4px; 
-        font-family: monospace; 
-        font-weight: bold;
+        background-color: #e3f2fd; border: 1px solid #1565c0; color: #1565c0;
+        padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: monospace;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE FORMATAÇÃO ---
+# --- FUNÇÃO DE FORMATAÇÃO (ARIAL / ABNT) ---
 def aplicar_estilo(paragrafo, tamanho=11, negrito=False, alinhamento=None, espaco_depois=0, entrelinhas=1.0, recuo=0):
+    # Configura Fonte
     for run in paragrafo.runs:
         run.font.name = 'Arial'
         run.font.size = Pt(tamanho)
         run.bold = negrito
         run._element.rPr.rFonts.set(qn('w:eastAsia'), 'Arial')
 
+    # Configura Parágrafo
     p_format = paragrafo.paragraph_format
     p_format.space_after = Pt(espaco_depois)
     p_format.line_spacing = entrelinhas
-    
-    if recuo > 0:
-        p_format.first_line_indent = Cm(recuo)
-    
-    if alinhamento is not None:
-        paragrafo.alignment = alinhamento
+    if recuo > 0: p_format.first_line_indent = Cm(recuo)
+    if alinhamento is not None: paragrafo.alignment = alinhamento
 
 # --- GERENCIAMENTO DE AGENTES ---
 if 'num_agentes' not in st.session_state:
-    st.session_state.num_agentes = 2
+    st.session_state.num_agentes = 1
 
 def add_agente(): st.session_state.num_agentes += 1
 def remove_agente(): 
     if st.session_state.num_agentes > 1: st.session_state.num_agentes -= 1
 
-# --- BARRA LATERAL ---
+# --- BARRA LATERAL (CONFIGURAÇÕES GERAIS) ---
 with st.sidebar:
-    st.title("Configurações")
-    opj = st.text_input("OPJ:", "INTERCEPTUM")
-    processo = st.text_input("Processo:", "0002343-02.2025.8.17.3410")
-    data_doc = st.date_input("Data:")
-    hora_doc = st.time_input("Hora:")
-    local = st.text_input("Local:", "Sítio Salvador, nº 360, Zona Rural...")
+    st.header("1. Cabeçalho do Documento")
+    # Título editável para servir para qualquer crime
+    titulo_doc = st.text_input("Título do Relatório:", value="RELATÓRIO DE INVESTIGAÇÃO")
+    
+    st.markdown("---")
+    opj = st.text_input("OPJ (Opcional):", placeholder="Ex: INTERCEPTUM")
+    natureza = st.text_input("Natureza do Fato:", placeholder="Ex: Homicídio Doloso, Tráfico...")
+    processo = st.text_input("Nº Processo / BO / IP:", placeholder="0000000-00.2025...")
+    
+    c1, c2 = st.columns(2)
+    data_doc = c1.date_input("Data:")
+    hora_doc = c2.time_input("Hora:")
+    
+    local = st.text_input("Local do Fato/Diligência:", placeholder="Rua, Bairro, Cidade...")
 
-# --- TÍTULO ---
-st.title("🚓 Gerador com Inserção Inteligente de Fotos")
+# --- ÁREA PRINCIPAL ---
+st.title("🚓 Gerador de Relatório Policial (Genérico)")
+st.caption("Preencha apenas o que for necessário. Campos em branco não aparecerão no documento.")
 
-# --- ABAS ---
-tab_alvo, tab_fotos, tab_relato, tab_equipe = st.tabs(["1. Alvo", "2. Upload de Fotos (Importante)", "3. Relato", "4. Equipe"])
+# --- ABAS DE PREENCHIMENTO ---
+tab_env, tab_texto, tab_fotos, tab_equipe = st.tabs(["👥 Envolvidos", "📝 Texto do Relatório", "📸 Fotos", "👮 Equipe"])
 
-# Variável global para armazenar as fotos carregadas
+with tab_env:
+    st.subheader("Dados das Partes")
+    col_a, col_b = st.columns(2)
+    
+    with col_a:
+        st.markdown("##### 🔴 Alvo / Suspeito (Se houver)")
+        alvo_nome = st.text_input("Nome do Alvo:")
+        alvo_alcunha = st.text_input("Vulgo / Alcunha:")
+        alvo_docs = st.text_input("CPF / RG (Alvo):")
+        alvo_nasc = st.text_input("Nascimento / Idade:")
+    
+    with col_b:
+        st.markdown("##### 🔵 Vítima / Testemunha")
+        vitima_nome = st.text_input("Nome da Vítima:")
+        testemunha_nome = st.text_input("Nome da Testemunha:")
+        advogado_nome = st.text_input("Advogado Presente:")
+
+with tab_texto:
+    st.subheader("Redação")
+    st.info("💡 Dica: Use **[FOTO1]**, **[FOTO2]** no meio do texto para inserir as imagens automaticamente nessa posição.")
+    texto_relato = st.text_area("Descreva a diligência ou investigação:", height=400, placeholder="No dia tal, a equipe deslocou-se...")
+
+# Variável para guardar as fotos
 fotos_carregadas = []
 
-with tab_alvo:
-    c1, c2 = st.columns(2)
-    alvo_nome = c1.text_input("Nome Alvo:", "ALEX DO CARMO CORREIA")
-    alvo_docs = c2.text_input("Docs:", "CPF: ...")
-    c3, c4 = st.columns(2)
-    nascimento = c3.text_input("Nascimento:", "15/04/2004")
-    advogado = c4.text_input("Advogado:", "Dr. Adevaldo...")
-    testemunha = st.text_input("Testemunha:", "Sra. Marilene...")
-
 with tab_fotos:
-    st.info("📸 Faça o upload das fotos aqui. O sistema gerará um CÓDIGO para cada uma.")
+    st.subheader("Upload de Evidências")
     fotos_carregadas = st.file_uploader("Selecione as imagens", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
     
     if fotos_carregadas:
-        st.write("---")
-        st.subheader("📋 Códigos para usar no texto:")
-        cols = st.columns(4)
-        for i, foto in enumerate(fotos_carregadas):
-            with cols[i % 4]:
-                # Mostra a imagem pequena e o código dela
-                st.image(foto, width=100)
-                st.markdown(f"Use: <span class='tag-foto'>[FOTO{i+1}]</span>", unsafe_allow_html=True)
-                st.caption(f"Nome: {foto.name}")
-
-with tab_relato:
-    st.subheader("Redação do Relatório")
-    st.markdown("""
-    **Como inserir fotos:**
-    Escreva seu texto normalmente. Onde quiser uma imagem, digite o código dela (ex: `[FOTO1]`).
-    
-    *Exemplo:*
-    > *A equipe entrou na residência. **[FOTO1]** No quarto, foi encontrada uma arma em cima da cama. **[FOTO2]** O suspeito foi conduzido...*
-    """)
-    texto_relato = st.text_area("Digite o relato:", height=400, placeholder="Digite o texto aqui...")
+        st.markdown("---")
+        st.write("##### Códigos para inserção no texto:")
+        cols = st.columns(5)
+        for i, f in enumerate(fotos_carregadas):
+            with cols[i % 5]:
+                st.image(f, width=80)
+                st.markdown(f"<span class='tag-foto'>[FOTO{i+1}]</span>", unsafe_allow_html=True)
 
 with tab_equipe:
+    st.subheader("Responsáveis")
     agentes_dados = []
     for i in range(st.session_state.num_agentes):
         c1, c2 = st.columns([3, 2])
-        nome = c1.text_input(f"Nome {i+1}", key=f"n{i}")
-        cargo = c2.text_input(f"Cargo {i+1}", key=f"c{i}", value="Investigador de Polícia")
+        # Agora começa vazio para você preencher
+        nome = c1.text_input(f"Nome do Agente {i+1}", key=f"n{i}", placeholder="Nome Completo")
+        cargo = c2.text_input(f"Cargo/Matrícula {i+1}", key=f"c{i}", value="Agente de Polícia")
         agentes_dados.append({'nome': nome, 'cargo': cargo})
-    st.button("➕ Add Agente", on_click=add_agente)
+    
+    st.button("➕ Adicionar Policial", on_click=add_agente)
+    st.button("➖ Remover Policial", on_click=remove_agente)
 
-# --- BOTÃO GERAR ---
+# --- GERAÇÃO DO DOCUMENTO ---
 st.markdown("---")
-if st.button("🚀 GERAR RELATÓRIO CUSTOMIZADO", type="primary"):
+if st.button("🚀 GERAR RELATÓRIO OFICIAL", type="primary"):
     doc = Document()
     
-    # 1. Margens
+    # 1. Margens ABNT/Oficial
     sec = doc.sections[0]
     sec.top_margin = Inches(0.5); sec.bottom_margin = Inches(0.5)
     sec.left_margin = Inches(0.7); sec.right_margin = Inches(0.7)
 
-    # 2. Cabeçalho (Sem Logo/Rodapé conforme preferência anterior)
+    # 2. Cabeçalho (Padrão PCPE Simples)
     p = doc.add_paragraph()
     p.add_run("POLÍCIA CIVIL DE PERNAMBUCO\nDINTER 1-16ª DESEC\nDelegacia de Polícia da 116ª Circunscrição - Surubim")
     aplicar_estilo(p, 10, True, WD_ALIGN_PARAGRAPH.CENTER)
     doc.add_paragraph()
 
-    # 3. Título e Dados
+    # 3. Título (O que você digitou na barra lateral)
     p = doc.add_paragraph()
-    p.add_run("RELATÓRIO DE CUMPRIMENTO DE MANDADO DE BUSCA E APREENSÃO DOMICILIAR")
+    p.add_run(titulo_doc.upper())
     aplicar_estilo(p, 12, True, WD_ALIGN_PARAGRAPH.CENTER, espaco_depois=12)
 
-    def add_dado(label, valor):
-        p = doc.add_paragraph()
-        p.add_run(f"{label}: ").bold = True
-        p.add_run(str(valor))
-        aplicar_estilo(p, 11, espaco_depois=2)
+    # 4. Bloco de Dados Iniciais (Só adiciona se tiver texto)
+    def add_linha(rotulo, valor):
+        if valor: # Só imprime se o usuário digitou algo
+            p = doc.add_paragraph()
+            p.add_run(f"{rotulo}: ").bold = True
+            p.add_run(str(valor))
+            aplicar_estilo(p, 11, espaco_depois=2)
 
     data_fmt = data_doc.strftime("%d/%m/%Y")
-    add_dado("OPJ", opj); add_dado("PROCESSO", processo)
-    add_dado("DATA/HORA", f"{data_fmt} às {hora_doc}"); add_dado("LOCAL", local)
-    doc.add_paragraph()
+    add_linha("NATUREZA", natureza)
+    add_linha("OPJ", opj)
+    add_linha("REFERÊNCIA", processo)
+    add_linha("DATA/HORA", f"{data_fmt} às {hora_doc}")
+    add_linha("LOCAL", local)
+    
+    doc.add_paragraph() # Espaço
 
-    # 4. Alvo
+    # 5. Seção Envolvidos (Genérica)
+    # Verifica se tem algum dado preenchido para criar o título
+    tem_dados = any([alvo_nome, vitima_nome, testemunha_nome, advogado_nome])
+    
+    if tem_dados:
+        p = doc.add_paragraph()
+        p.add_run("DOS ENVOLVIDOS")
+        aplicar_estilo(p, negrito=True, espaco_depois=6)
+
+        if alvo_nome:
+            texto_alvo = alvo_nome
+            if alvo_alcunha: texto_alvo += f" (Vulgo: {alvo_alcunha})"
+            if alvo_docs: texto_alvo += f" | {alvo_docs}"
+            add_linha("ALVO/SUSPEITO", texto_alvo)
+            add_linha("DADOS DO ALVO", alvo_nasc)
+        
+        add_linha("VÍTIMA", vitima_nome)
+        add_linha("TESTEMUNHA", testemunha_nome)
+        add_linha("ADVOGADO", advogado_nome)
+        
+        doc.add_paragraph()
+
+    # 6. Texto do Relatório (Com sistema de fotos)
     p = doc.add_paragraph()
-    p.add_run("DO ALVO E TESTEMUNHAS")
-    aplicar_estilo(p, negrito=True, espaco_depois=6)
-    add_dado("ALVO", f"{alvo_nome} | {alvo_docs}")
-    add_dado("DADOS", f"Nasc: {nascimento} | Adv: {advogado}")
-    add_dado("TESTEMUNHA", testemunha)
-    doc.add_paragraph()
-
-    # 5. DILIGÊNCIA (A Lógica Mágica de Inserção)
-    p = doc.add_paragraph()
-    p.add_run("DA DILIGÊNCIA E CUMPRIMENTO DO MANDADO")
+    p.add_run("DO RELATO / DILIGÊNCIA")
     aplicar_estilo(p, negrito=True, espaco_depois=6)
 
-    # Divide o texto procurando por padrões [FOTO1], [FOTO2]...
-    # O regex r'\[FOTO(\d+)\]' separa o texto e captura o número da foto
+    # Lógica de inserção de imagem
     partes = re.split(r'\[FOTO(\d+)\]', texto_relato)
     
-    # O 'partes' vai ser algo como: ["Texto antes", "1", "Texto depois", "2", "Final"]
-    
-    for i, parte in enumerate(partes):
-        # Se for um número (que veio do regex), é hora de por a foto
+    for parte in partes:
         if parte.isdigit():
-            idx = int(parte) - 1 # Converte "1" para índice 0
+            idx = int(parte) - 1
             if 0 <= idx < len(fotos_carregadas):
-                foto_arquivo = fotos_carregadas[idx]
-                
-                # Inserir Foto
+                foto = fotos_carregadas[idx]
                 p_img = doc.add_paragraph()
                 p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run_img = p_img.add_run()
-                run_img.add_picture(foto_arquivo, width=Inches(5.5))
+                run_img.add_picture(foto, width=Inches(5.5))
                 
-                # Inserir Legenda
                 p_leg = doc.add_paragraph()
                 p_leg.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                p_leg.add_run(f"Figura {idx+1}: {foto_arquivo.name}")
+                p_leg.add_run(f"Figura {idx+1}") # Legenda simples
                 aplicar_estilo(p_leg, 9, espaco_depois=12)
-            else:
-                # Caso o usuário digite [FOTO99] e não exista
-                p_erro = doc.add_paragraph()
-                p_erro.add_run(f"[ERRO: Imagem {parte} não encontrada]").font.color.rgb = None
-                aplicar_estilo(p_erro, 11, negrito=True, alinhamento=WD_ALIGN_PARAGRAPH.CENTER)
-
-        # Se não for número, é texto normal
         else:
-            # Processa o texto para manter parágrafos se houver quebras de linha
-            sub_paragrafos = parte.split('\n')
-            for sub_p in sub_paragrafos:
-                if sub_p.strip():
-                    p_texto = doc.add_paragraph()
-                    p_texto.add_run(sub_p)
-                    aplicar_estilo(p_texto, 11, alinhamento=WD_ALIGN_PARAGRAPH.JUSTIFY, entrelinhas=1.5, espaco_depois=6, recuo=1.25)
+            # Texto normal
+            linhas = parte.split('\n')
+            for linha in linhas:
+                if linha.strip():
+                    p_txt = doc.add_paragraph()
+                    p_txt.add_run(linha)
+                    aplicar_estilo(p_txt, 11, alinhamento=WD_ALIGN_PARAGRAPH.JUSTIFY, entrelinhas=1.5, espaco_depois=6, recuo=1.25)
 
-    # 6. Assinaturas
+    # 7. Assinaturas
     doc.add_paragraph(); doc.add_paragraph()
     for ag in agentes_dados:
         if ag['nome']:
@@ -210,7 +220,8 @@ if st.button("🚀 GERAR RELATÓRIO CUSTOMIZADO", type="primary"):
             p.add_run(f"___________________________\n{ag['nome']}\n{ag['cargo']}")
             aplicar_estilo(p, 11, alinhamento=WD_ALIGN_PARAGRAPH.CENTER)
 
+    # Download
     bio = io.BytesIO()
     doc.save(bio)
     st.balloons()
-    st.download_button("📥 BAIXAR DOCX COMPLETO", bio.getvalue(), "Relatorio_Com_Fotos_No_Texto.docx", type="primary")
+    st.download_button("📥 BAIXAR RELATÓRIO (.DOCX)", bio.getvalue(), "Relatorio_Generico.docx", type="primary")
