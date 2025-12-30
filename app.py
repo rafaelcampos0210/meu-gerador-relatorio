@@ -1,8 +1,8 @@
 import streamlit as st
 from docx import Document
-from docx.shared import Inches, Pt, Cm
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_ALIGN_VERTICAL # Importante para alinhar o logo
+from docx.shared import Inches, Pt, Cm, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.oxml.ns import qn
 import io
 import re
@@ -31,6 +31,7 @@ def formatar_texto(run, tamanho=11, negrito=False, italico=False):
     run.font.size = Pt(tamanho)
     run.bold = negrito
     run.italic = italico
+    run.font.color.rgb = RGBColor(0, 0, 0) # Força PRETO puro
 
 def configurar_paragrafo(paragrafo, alinhamento=WD_ALIGN_PARAGRAPH.LEFT, espaco_depois=0, entrelinhas=1.0, recuo=0):
     p_fmt = paragrafo.paragraph_format
@@ -40,14 +41,14 @@ def configurar_paragrafo(paragrafo, alinhamento=WD_ALIGN_PARAGRAPH.LEFT, espaco_
     if recuo > 0:
         p_fmt.first_line_indent = Cm(recuo)
 
-# --- 4. CONFIGURAÇÃO DO CABEÇALHO (AJUSTE FINO DE POSIÇÃO) ---
+# --- 4. CONFIGURAÇÃO DO CABEÇALHO (IDENTICO AO MODELO) ---
 def criar_cabecalho_rodape(doc):
     section = doc.sections[0]
     
-    # Margens
+    # Margens Exatas
     section.top_margin = Inches(0.4)
     section.bottom_margin = Inches(0.5)
-    section.left_margin = Inches(0.7)
+    section.left_margin = Inches(0.8) # Margem esquerda levemente maior (padrão encadernação)
     section.right_margin = Inches(0.5)
     section.header_distance = Inches(0.2)
     section.footer_distance = Inches(0.2)
@@ -55,57 +56,55 @@ def criar_cabecalho_rodape(doc):
     # --- CABEÇALHO ---
     header = section.header
     
-    # Tabela de 3 colunas para centralização perfeita
-    # Largura Total ~ 7.1 polegadas
-    table = header.add_table(rows=1, cols=3, width=Inches(7.1))
+    # Tabela 2 Colunas:
+    # Col 1: Logo (Estreita)
+    # Col 2: Texto (Larga e Centralizada)
+    table = header.add_table(rows=1, cols=2, width=Inches(7.0))
     table.autofit = False
     
-    largura_lateral = Inches(1.3) # Espaço do Logo
-    largura_central = Inches(4.5) # Espaço do Texto
-    
-    table.columns[0].width = largura_lateral
-    table.columns[1].width = largura_central
-    table.columns[2].width = largura_lateral
+    # Ajuste milimétrico das colunas
+    table.columns[0].width = Inches(1.1)  # Apenas o suficiente para o logo
+    table.columns[1].width = Inches(5.9)  # Todo o resto para o texto
 
-    # 1. Coluna Esquerda: LOGO
+    # --- COLUNA 1: LOGO ---
     try:
         cell_logo = table.cell(0, 0)
-        cell_logo.vertical_alignment = WD_ALIGN_VERTICAL.CENTER # Alinhamento Vertical
+        cell_logo.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
         p_logo = cell_logo.paragraphs[0]
-        p_logo.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run_logo = p_logo.add_run()
-        run_logo.add_picture('logo_pc.png', width=Inches(1.05)) # Tamanho ajustado
+        run_logo.add_picture('logo_pc.png', width=Inches(1.0)) # Brasão tamanho padrão
     except:
         table.cell(0, 0).text = "[LOGO]"
 
-    # 2. Coluna Central: TEXTO (Bloco Compacto)
+    # --- COLUNA 2: TEXTO ---
     cell_text = table.cell(0, 1)
-    cell_text.vertical_alignment = WD_ALIGN_VERTICAL.CENTER # Texto no meio da célula
+    cell_text.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
     
-    # Limpa parágrafo padrão
+    # Limpa o conteúdo padrão da célula
     cell_text._element.clear_content()
-    
-    # Função auxiliar para linhas do cabeçalho (sem espaço entre elas)
-    def add_header_line(texto, tamanho, negrito=True):
+
+    # Função interna para criar linhas "coladas" (sem espaçamento extra)
+    def criar_linha_header(texto, tamanho, negrito=True):
         p = cell_text.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p.paragraph_format.space_after = Pt(0) # Remove espaço depois
-        p.paragraph_format.line_spacing = 1.0  # Entrelinha simples
+        # Configuração CRÍTICA para ficar idêntico:
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        p.paragraph_format.line_spacing = 1.0 # Simples
         r = p.add_run(texto)
         formatar_texto(r, tamanho=tamanho, negrito=negrito)
 
-    # Linhas do Cabeçalho
-    add_header_line("POLÍCIA CIVIL DE PERNAMBUCO", 13)
-    add_header_line("DINTER 1 - 16ª DESEC", 10.5)
-    add_header_line("Delegacia de Polícia da 116ª Circunscrição - Surubim", 10.5)
-
-    # 3. Coluna Direita: Vazia (Balanceamento)
-    # (Não faz nada, serve apenas para ocupar espaço e empurrar o centro)
+    # Inserção das Linhas
+    criar_linha_header("POLÍCIA CIVIL DE PERNAMBUCO", 14) # Tamanho 14 (Destaque)
+    criar_linha_header("DINTER 1 - 16ª DESEC", 11)        # Tamanho 11
+    criar_linha_header("Delegacia de Polícia da 116ª Circunscrição - Surubim", 11) # Tamanho 11
 
     # --- RODAPÉ ---
     footer = section.footer
     p_foot = footer.paragraphs[0]
     p_foot.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # Texto do rodapé em bloco único
     r_foot = p_foot.add_run("Av. São Sebastião - Surubim - PE | Fone: (81) 3624-1974\nE-mail: dp116circ.surubim@policiacivil.pe.gov.br")
     formatar_texto(r_foot, tamanho=9)
 
@@ -125,12 +124,12 @@ with st.sidebar:
     natureza = st.text_input("Natureza:", placeholder="Ex: Homicídio...")
     
     c1, c2 = st.columns(2)
-    data_input = c1.text_input("Data:", placeholder="DD/MM/AAAA")
+    data_input = c1.text_input("Data:", placeholder="DD de Mês de AAAA")
     hora_input = c2.text_input("Hora:", placeholder="HH:MM")
     
-    local = st.text_input("Local:", placeholder="Endereço...")
+    local = st.text_input("Local:", placeholder="Endereço completo...")
 
-st.title("🚓 Gerador PCPE (Oficial V20)")
+st.title("🚓 Gerador PCPE (Layout Fixo)")
 
 tab1, tab2, tab3, tab4 = st.tabs(["👤 Envolvidos", "📝 Relato", "📸 Fotos", "👮 Equipe"])
 
@@ -178,16 +177,16 @@ st.markdown("---")
 if st.button("GERAR RELATÓRIO FINAL", type="primary"):
     doc = Document()
     
-    # 1. Cabeçalho Perfeito
+    # 1. Cabeçalho Configurado
     criar_cabecalho_rodape(doc)
     
-    # 2. Título
+    # 2. Título do Documento
     p_tit = doc.add_paragraph()
     r_tit = p_tit.add_run(titulo_doc.upper())
     formatar_texto(r_tit, tamanho=12, negrito=True)
     configurar_paragrafo(p_tit, alinhamento=WD_ALIGN_PARAGRAPH.CENTER, espaco_depois=12)
 
-    # 3. Dados
+    # 3. Dados Iniciais
     def add_dado(chave, valor):
         if valor:
             p = doc.add_paragraph()
@@ -195,7 +194,7 @@ if st.button("GERAR RELATÓRIO FINAL", type="primary"):
             formatar_texto(r_k, negrito=True)
             r_v = p.add_run(str(valor))
             formatar_texto(r_v, negrito=False)
-            configurar_paragrafo(p, espaco_depois=0)
+            configurar_paragrafo(p, espaco_depois=0) # Linha colada
 
     add_dado("NATUREZA", natureza)
     add_dado("OPERAÇÃO (OPJ)", f"\"{opj}\"" if opj else None)
@@ -270,4 +269,4 @@ if st.button("GERAR RELATÓRIO FINAL", type="primary"):
     bio = io.BytesIO()
     doc.save(bio)
     st.balloons()
-    st.download_button("⬇️ BAIXAR DOCX PERFEITO", bio.getvalue(), "Relatorio_PCPE_Oficial.docx", type="primary")
+    st.download_button("⬇️ BAIXAR DOCX PADRÃO OFICIAL", bio.getvalue(), "Relatorio_PCPE_Identico.docx", type="primary")
