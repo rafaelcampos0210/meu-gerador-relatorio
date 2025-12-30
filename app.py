@@ -21,6 +21,7 @@ st.markdown("""
     .stTextArea textarea {font-size: 15px; line-height: 1.6; font-family: 'Arial';}
     .tag-foto {background-color: #e3f2fd; border: 1px solid #1565c0; color: #1565c0; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: monospace;}
     .sucesso-ia {padding: 10px; background-color: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 10px; border: 1px solid #c3e6cb;}
+    .aviso-fallback {padding: 10px; background-color: #fff3cd; color: #856404; border-radius: 5px; margin-bottom: 10px; border: 1px solid #ffeeba; font-size: 12px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -40,8 +41,6 @@ def aplicar_estilo(paragrafo, tamanho=11, negrito=False, alinhamento=None, espac
 def melhorar_texto_com_ia(texto_bruto):
     try:
         genai.configure(api_key=CHAVE_API_GOOGLE)
-        # Tenta o modelo Flash (mais rápido e moderno)
-        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
         Você é um escrivão de polícia experiente. Reescreva o relato abaixo para um Relatório Oficial de Investigação.
@@ -56,18 +55,28 @@ def melhorar_texto_com_ia(texto_bruto):
         RASCUNHO ORIGINAL:
         {texto_bruto}
         """
-        response = model.generate_content(prompt)
-        return response.text
+
+        # TENTATIVA 1: Modelo Rápido (Flash)
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(prompt)
+            return response.text, "Flash (Rápido)"
+            
+        except Exception:
+            # TENTATIVA 2: Modelo Clássico (Pro) - FALLBACK
+            # Se o Flash falhar por causa da versão, usa este que é garantido
+            model = genai.GenerativeModel('gemini-pro')
+            response = model.generate_content(prompt)
+            return response.text, "Pro (Compatível)"
+
     except Exception as e:
-        # Se der erro, tenta listar os modelos disponíveis para ajudar no diagnóstico
-        erro_msg = str(e)
-        if "404" in erro_msg:
-            return f"⚠️ ERRO DE VERSÃO: O Streamlit não atualizou a biblioteca. \n\nSOLUÇÃO: Vá no painel do Streamlit, clique nos 3 pontinhos do app e selecione 'Reboot app'."
-        return f"Erro na IA: {erro_msg}"
+        return f"Erro Crítico na IA: {str(e)}", "Erro"
 
 # --- 4. ESTADO ---
 if 'num_agentes' not in st.session_state: st.session_state.num_agentes = 1
 if 'texto_final' not in st.session_state: st.session_state.texto_final = ""
+if 'modelo_usado' not in st.session_state: st.session_state.modelo_usado = ""
+
 def add_agente(): st.session_state.num_agentes += 1
 def remove_agente(): 
     if st.session_state.num_agentes > 1: st.session_state.num_agentes -= 1
@@ -76,14 +85,7 @@ def remove_agente():
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/9203/9203764.png", width=60)
     st.header("Configurações")
-    
-    # Verifica a versão da biblioteca (Diagnóstico)
-    versao_lib = genai.__version__
-    if versao_lib < "0.7.0":
-        st.error(f"⚠️ Biblioteca Antiga Detectada ({versao_lib})")
-        st.info("Por favor, faça o REBOOT do app para atualizar.")
-    else:
-        st.success(f"✅ Sistema Atualizado (v{versao_lib})")
+    st.success("✅ Sistema Híbrido Ativo")
 
     st.divider()
     st.subheader("📄 Cabeçalho")
@@ -143,18 +145,22 @@ with tab_texto:
             if not rascunho:
                 st.warning("Escreva algo primeiro!")
             else:
-                with st.spinner("A IA está reescrevendo..."):
-                    res = melhorar_texto_com_ia(rascunho)
-                    st.session_state.texto_final = res
+                with st.spinner("A IA está trabalhando..."):
+                    texto_ia, modelo_nome = melhorar_texto_com_ia(rascunho)
+                    st.session_state.texto_final = texto_ia
+                    st.session_state.modelo_usado = modelo_nome
                     st.rerun()
 
     with c_out:
         st.markdown("#### Texto Final")
         if st.session_state.texto_final:
-            if "ERRO" in st.session_state.texto_final:
+            if "Erro Crítico" in st.session_state.texto_final:
                 st.error(st.session_state.texto_final)
             else:
                 st.markdown("<div class='sucesso-ia'>✅ Texto Pronto!</div>", unsafe_allow_html=True)
+                if st.session_state.modelo_usado == "Pro (Compatível)":
+                    st.markdown(f"<div class='aviso-fallback'>⚠️ Usando modo compatibilidade (Gemini Pro).</div>", unsafe_allow_html=True)
+                
         texto_oficial = st.text_area("Resultado:", height=400, value=st.session_state.texto_final)
 
 # ABA 4: EQUIPE
