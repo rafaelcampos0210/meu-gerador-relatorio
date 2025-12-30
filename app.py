@@ -39,12 +39,12 @@ def configurar_paragrafo(paragrafo, alinhamento=WD_ALIGN_PARAGRAPH.LEFT, espaco_
     if recuo > 0:
         p_fmt.first_line_indent = Cm(recuo)
 
-# --- 4. CONFIGURAÇÃO DO CABEÇALHO (CORRIGIDO E CENTRALIZADO) ---
+# --- 4. CONFIGURAÇÃO DO CABEÇALHO (TÉCNICA DE 3 COLUNAS) ---
 def criar_cabecalho_rodape(doc):
     section = doc.sections[0]
     
-    # Margens do Modelo (Estreitas)
-    section.top_margin = Inches(0.4)    # Margem superior menor para o cabeçalho subir
+    # Margens
+    section.top_margin = Inches(0.4)
     section.bottom_margin = Inches(0.5)
     section.left_margin = Inches(0.7)
     section.right_margin = Inches(0.5)
@@ -54,45 +54,49 @@ def criar_cabecalho_rodape(doc):
     # --- CABEÇALHO ---
     header = section.header
     
-    # Cria tabela ocupando 100% da largura útil (aprox 7 polegadas)
-    # Coluna 1 (Logo): Pequena | Coluna 2 (Texto): Grande e Centralizada
-    table = header.add_table(rows=1, cols=2, width=Inches(7.2))
+    # TRUQUE: Tabela de 3 colunas para garantir que o texto fique no CENTRO DA PÁGINA
+    # Col 1 (Logo) | Col 2 (Texto) | Col 3 (Vazia para equilíbrio)
+    # Largura Total ~ 7.0 polegadas (Margem util)
+    table = header.add_table(rows=1, cols=3, width=Inches(7.0))
     table.autofit = False
-    table.columns[0].width = Inches(1.3) # Espaço para o Brasão
-    table.columns[1].width = Inches(5.9) # Espaço para o Texto (Bem largo para centralizar)
+    
+    # Define larguras exatas para balancear
+    largura_lateral = Inches(1.2)
+    largura_central = Inches(4.6)
+    
+    table.columns[0].width = largura_lateral # Esquerda (Logo)
+    table.columns[1].width = largura_central # Centro (Texto)
+    table.columns[2].width = largura_lateral # Direita (Vazia) - O segredo está aqui!
 
-    # Célula 1: Logo
+    # 1. Coluna Esquerda: LOGO
     try:
         cell_logo = table.cell(0, 0)
-        # Centraliza o logo verticalmente na célula
-        cell_logo.vertical_alignment = WD_ALIGN_PARAGRAPH.CENTER 
+        cell_logo.vertical_alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_logo = cell_logo.paragraphs[0]
-        p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_logo.alignment = WD_ALIGN_PARAGRAPH.LEFT # Logo alinhado à esquerda
         run_logo = p_logo.add_run()
-        # Logo um pouco maior (1.0 polegada)
         run_logo.add_picture('logo_pc.png', width=Inches(1.0))
     except:
         table.cell(0, 0).text = "[LOGO]"
 
-    # Célula 2: Texto Institucional
+    # 2. Coluna Central: TEXTO (Centralizado)
     cell_text = table.cell(0, 1)
     cell_text.vertical_alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_text = cell_text.paragraphs[0]
-    p_text.alignment = WD_ALIGN_PARAGRAPH.CENTER # Centraliza o texto na página
+    p_text.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
-    # Ajuste fino: Adiciona uma quebra de linha antes para descer levemente o texto se precisar
-    # p_text.add_run("\n") 
-    
-    # Título Principal (Fonte 16 para destaque)
+    # Título Principal
     r1 = p_text.add_run("POLÍCIA CIVIL DE PERNAMBUCO\n")
     formatar_texto(r1, tamanho=16, negrito=True)
     
-    # Subtítulos (Fonte 12)
+    # Subtítulos
     r2 = p_text.add_run("DINTER 1 - 16ª DESEC\n")
     formatar_texto(r2, tamanho=12, negrito=True)
     
     r3 = p_text.add_run("Delegacia de Polícia da 116ª Circunscrição - Surubim")
     formatar_texto(r3, tamanho=12, negrito=True)
+    
+    # 3. Coluna Direita: VAZIA (Não fazemos nada, ela existe só para empurrar o centro para o meio)
 
     # --- RODAPÉ ---
     footer = section.footer
@@ -122,7 +126,7 @@ with st.sidebar:
     
     local = st.text_input("Local:", placeholder="Endereço...")
 
-st.title("🚓 Gerador PCPE (Formato Final)")
+st.title("🚓 Gerador PCPE (Formato Final Ajustado)")
 
 tab1, tab2, tab3, tab4 = st.tabs(["👤 Envolvidos", "📝 Relato", "📸 Fotos", "👮 Equipe"])
 
@@ -170,7 +174,7 @@ st.markdown("---")
 if st.button("GERAR RELATÓRIO CORRIGIDO", type="primary"):
     doc = Document()
     
-    # 1. Cabeçalho Corrigido
+    # 1. Cabeçalho Corrigido (3 Colunas)
     criar_cabecalho_rodape(doc)
     
     # 2. Título
@@ -262,4 +266,4 @@ if st.button("GERAR RELATÓRIO CORRIGIDO", type="primary"):
     bio = io.BytesIO()
     doc.save(bio)
     st.balloons()
-    st.download_button("⬇️ BAIXAR DOCX", bio.getvalue(), "Relatorio_PCPE_Oficial.docx", type="primary")
+    st.download_button("⬇️ BAIXAR DOCX CORRIGIDO", bio.getvalue(), "Relatorio_PCPE_Final.docx", type="primary")
